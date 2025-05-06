@@ -8,13 +8,6 @@
 
 ---
 
-## 🎥 Demo Preview
-
-https://github.com/yourusername/mera-bharat-yatra/assets/12345678/sample-video.mp4
-
-*(Replace with your actual demo video link)*
-
----
 
 ## ✨ Key Features
 
