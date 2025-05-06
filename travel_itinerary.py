@@ -52,6 +52,16 @@ def main():
     # Configure Gemini
     configure_gemini()
     
+    # Initialize session state for itinerary editing
+    if 'itinerary_generated' not in st.session_state:
+        st.session_state.itinerary_generated = False
+    if 'editing_itinerary' not in st.session_state:
+        st.session_state.editing_itinerary = False
+    if 'current_itinerary' not in st.session_state:
+        st.session_state.current_itinerary = ""
+    if 'form_submitted' not in st.session_state:
+        st.session_state.form_submitted = False
+    
     # Trip details form
     with st.form("travel_preferences"):
         col1, col2 = st.columns(2)
@@ -83,10 +93,10 @@ def main():
         
         budget = st.selectbox("Budget Level", ["Budget", "Mid-range", "Luxury"], index=1)
         
-        # Submit button - THIS WAS MISSING
         submitted = st.form_submit_button("Generate Itinerary", type="primary")
     
     if submitted:
+        st.session_state.form_submitted = True
         if not destination:
             st.error("Please enter a destination")
             return
@@ -124,32 +134,67 @@ def main():
                 """
                 
                 response = model.generate_content(prompt)
-                
-                # Process and display the formatted response
-                st.success("## Here's Your Personalized Itinerary")
-                st.markdown(f"### ✈️ {destination} | 📅 {start_date.strftime('%b %d')} - {end_date.strftime('%b %d')} | 👪 {num_people} travelers")
-                
-                # Convert response to formatted Markdown
-                formatted_response = response.text
-                formatted_response = formatted_response.replace("<day>", "### 🗓️ ").replace("</day>", "")
-                formatted_response = formatted_response.replace("<time>", "**⏰ ").replace("</time>", "**")
-                formatted_response = formatted_response.replace("<activity>", "\n• ").replace("</activity>", "")
-                formatted_response = formatted_response.replace("<restaurant>", "🍴 ").replace("</restaurant>", "")
-                formatted_response = formatted_response.replace("<note>", "\n> 💡 **Tip:** ").replace("</note>", "")
-                
-                st.markdown(formatted_response, unsafe_allow_html=True)
-                
-                # Download button
-                st.download_button(
-                    label="📥 Download Itinerary",
-                    data=response.text,
-                    file_name=f"{destination}_itinerary_{start_date.strftime('%Y%m%d')}.txt",
-                    mime="text/plain",
-                    type="primary"
-                )
+                st.session_state.current_itinerary = response.text
+                st.session_state.itinerary_generated = True
+                st.session_state.editing_itinerary = False
                 
             except Exception as e:
                 st.error(f"Error generating itinerary: {str(e)}")
+    
+    # Display itinerary only once after generation
+    if st.session_state.itinerary_generated and st.session_state.form_submitted and not st.session_state.editing_itinerary:
+        display_itinerary(st.session_state.current_itinerary, destination, start_date, end_date, num_people)
+        st.session_state.form_submitted = False
+    
+    # Edit itinerary section
+    if st.session_state.itinerary_generated and not st.session_state.editing_itinerary:
+        if st.button("✏️ Customize Itinerary"):
+            st.session_state.editing_itinerary = True
+    
+    if st.session_state.editing_itinerary:
+        with st.form("edit_itinerary"):
+            edited_itinerary = st.text_area("Edit your itinerary", 
+                                          value=st.session_state.current_itinerary,
+                                          height=400)
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                save_changes = st.form_submit_button("💾 Save Changes")
+            with col2:
+                cancel_edit = st.form_submit_button("❌ Cancel")
+            
+            if save_changes:
+                st.session_state.current_itinerary = edited_itinerary
+                st.session_state.editing_itinerary = False
+                st.session_state.form_submitted = True
+                st.rerun()
+            
+            if cancel_edit:
+                st.session_state.editing_itinerary = False
+                st.rerun()
+
+def display_itinerary(itinerary_text, destination, start_date, end_date, num_people):
+    st.success("## Here's Your Personalized Itinerary")
+    st.markdown(f"### ✈️ {destination} | 📅 {start_date.strftime('%b %d')} - {end_date.strftime('%b %d')} | 👪 {num_people} travelers")
+    
+    # Convert response to formatted Markdown
+    formatted_response = itinerary_text
+    formatted_response = formatted_response.replace("<day>", "### 🗓️ ").replace("</day>", "")
+    formatted_response = formatted_response.replace("<time>", "**⏰ ").replace("</time>", "**")
+    formatted_response = formatted_response.replace("<activity>", "\n• ").replace("</activity>", "")
+    formatted_response = formatted_response.replace("<restaurant>", "🍴 ").replace("</restaurant>", "")
+    formatted_response = formatted_response.replace("<note>", "\n> 💡 **Tip:** ").replace("</note>", "")
+    
+    st.markdown(formatted_response, unsafe_allow_html=True)
+    
+    # Download button
+    st.download_button(
+        label="📥 Download Itinerary",
+        data=st.session_state.current_itinerary,
+        file_name=f"{destination}_itinerary_{start_date.strftime('%Y%m%d')}.txt",
+        mime="text/plain",
+        type="primary"
+    )
 
 if __name__ == "__main__":
     main()
